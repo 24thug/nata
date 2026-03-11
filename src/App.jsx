@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 const videos = [
-  { file: "/1.MOV", label: "динамичный lifestyle reel", number: "01" },
-  { file: "/2.MOV", label: "быстрый монтаж с акцентом на ритм", number: "02" },
-  { file: "/3.MOV", label: "визуал для личного бренда", number: "03" },
-  { file: "/4.MOV", label: "вертикальный storytelling", number: "04" },
-  { file: "/5.MOV", label: "монтаж с чистой структурой и вайбом", number: "05" },
+  { file: "1.MOV", label: "динамичный lifestyle reel", number: "01" },
+  { file: "2.MOV", label: "быстрый монтаж с акцентом на ритм", number: "02" },
+  { file: "3.MOV", label: "визуал для личного бренда", number: "03" },
+  { file: "4.MOV", label: "вертикальный storytelling", number: "04" },
+  { file: "5.MOV", label: "монтаж с чистой структурой и вайбом", number: "05" },
 ];
 
 const tickerItems = [
@@ -33,6 +33,8 @@ const services = [
     text: "Пакетная съемка серии роликов за один съемочный день с продуманной структурой.",
   },
 ];
+
+const mediaUrl = (file) => `${import.meta.env.BASE_URL}${file}`;
 
 function InteractiveVideo({ src, className, autoPlay = false, loop = false, controls = false, ariaLabel }) {
   const videoRef = useRef(null);
@@ -360,7 +362,7 @@ export default function App() {
 
           <div className="reveal-base mx-auto grid w-full min-w-0 max-w-none gap-3.5 min-[960px]:w-[min(100%,32rem)]" data-reveal aria-label="Превью работ">
             <article className="overflow-hidden rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] shadow-[0_20px_50px_rgba(35,20,6,0.12)]">
-              <InteractiveVideo src="/1.MOV" className="aspect-[3/4] w-full object-cover" autoPlay loop ariaLabel="Hero preview video" />
+              <InteractiveVideo src={mediaUrl("1.MOV")} className="aspect-[3/4] w-full object-cover" autoPlay loop ariaLabel="Hero preview video" />
             </article>
           </div>
         </section>
@@ -409,7 +411,7 @@ export default function App() {
                 data-reveal
                 className={`reveal-base flex h-full flex-col rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] p-2.5 shadow-[0_20px_50px_rgba(35,20,6,0.12)] ${index === 0 ? "min-[1040px]:translate-y-6" : ""} ${index === 2 ? "min-[1040px]:-translate-y-2.5" : ""}`}
               >
-                <InteractiveVideo src={video.file} className="aspect-[9/16] w-full rounded-[14px] bg-[#d5c0ab] object-cover" autoPlay loop ariaLabel={`Showreel video ${video.number}`} />
+                <InteractiveVideo src={mediaUrl(video.file)} className="aspect-[9/16] w-full rounded-[14px] bg-[#d5c0ab] object-cover" autoPlay loop ariaLabel={`Showreel video ${video.number}`} />
                 <div className="mt-3 flex min-h-0 flex-col items-start gap-1.5 text-[0.86rem] min-[960px]:min-h-[3.2rem] min-[960px]:flex-row min-[960px]:items-start min-[960px]:justify-between min-[960px]:gap-3 min-[960px]:text-[0.9rem]">
                   <strong>{video.number}</strong>
                   <span className="flex-1 text-[#5e584f]">{video.label}</span>
