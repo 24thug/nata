@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-width: 320px;
+    background:
+      radial-gradient(circle at top left, rgba(244, 91, 63, 0.22), transparent 26%),
+      radial-gradient(circle at top right, rgba(17, 17, 17, 0.08), transparent 20%),
+      linear-gradient(180deg, #fbf6ef 0%, #f7efe4 42%, #f2e1cc 100%);
+    color: #111111;
+    font-family: "Trebuchet MS", "Arial Narrow", Arial, sans-serif;
+  }
+}
+
+@layer utilities {
+  .reveal-base {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal-base {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 500ms ease, transform 500ms ease;
+    }
+
+    .reveal-base.reveal-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-base {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  .ticker-marquee {
+    animation: ticker 22s linear infinite;
+  }
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
