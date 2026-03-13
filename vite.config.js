@@ -4,7 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: "/nata/",
+  // Use project subpath only for production hosting (e.g. GitHub Pages).
+  base: process.env.NODE_ENV === "production" ? "/nata/" : "/",
   server: {
     allowedHosts: ["exceedingly-amicable-hake.cloudpub.ru"],
   },

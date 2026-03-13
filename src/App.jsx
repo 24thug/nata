@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const videos = [
   { file: "1.MOV", label: "динамичный lifestyle reel", number: "01" },
@@ -9,14 +9,14 @@ const videos = [
 ];
 
 const tickerItems = [
-  "reels",
-  "ugc",
-  "editing",
-  "iphone cinematography",
-  "personal brand",
-  "fashion",
-  "beauty",
-  "lifestyle",
+  "Рилсы",
+  "графика",
+  "монтаж",
+  "iphone съемка",
+  "личный бренд",
+  "бьюти сфера",
+  "свадьбы",
+
 ];
 
 const services = [
@@ -36,24 +36,41 @@ const services = [
 
 const mediaUrl = (file) => `${import.meta.env.BASE_URL}${file}`;
 
-function InteractiveVideo({ src, className, autoPlay = false, loop = false, controls = false, ariaLabel }) {
+function InteractiveVideo({
+  src,
+  className,
+  autoPlay = false,
+  loop = false,
+  controls = false,
+  ariaLabel,
+  soundEnabled = false,
+  onSoundChange,
+  isActive = true,
+}) {
   const videoRef = useRef(null);
-  const [isMuted, setIsMuted] = useState(true);
   const [showBadge, setShowBadge] = useState(false);
   const [isBlurred, setIsBlurred] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = isMuted;
-  }, [isMuted]);
+    video.muted = !soundEnabled || !isActive;
+  }, [soundEnabled, isActive]);
 
   useEffect(() => {
-    if (!autoPlay) return undefined;
     const video = videoRef.current;
     if (!video) return undefined;
 
+    if (!isActive) {
+      video.muted = true;
+      video.pause();
+      return undefined;
+    }
+
+    if (!autoPlay) return undefined;
+
     const tryPlay = () => {
+      video.muted = !soundEnabled;
       const playPromise = video.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => {});
@@ -76,24 +93,7 @@ function InteractiveVideo({ src, className, autoPlay = false, loop = false, cont
       video.removeEventListener("canplay", tryPlay);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [autoPlay]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return undefined;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) {
-          setIsMuted(true);
-        }
-      },
-      { threshold: 0.2 },
-    );
-
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, []);
+  }, [autoPlay, isActive, soundEnabled, src]);
 
   useEffect(() => {
     if (!showBadge) return undefined;
@@ -109,13 +109,15 @@ function InteractiveVideo({ src, className, autoPlay = false, loop = false, cont
 
   const toggleSound = () => {
     const video = videoRef.current;
-    if (video && video.paused) {
+    if (video && isActive && video.paused) {
       const playPromise = video.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => {});
       }
     }
-    setIsMuted((prev) => !prev);
+
+    onSoundChange?.(!soundEnabled);
+
     setShowBadge(true);
     setIsBlurred(true);
   };
@@ -128,7 +130,7 @@ function InteractiveVideo({ src, className, autoPlay = false, loop = false, cont
         autoPlay={autoPlay}
         controls={controls}
         loop={loop}
-        muted={isMuted}
+        muted={!soundEnabled || !isActive}
         playsInline
         preload="metadata"
         onClick={toggleSound}
@@ -142,7 +144,7 @@ function InteractiveVideo({ src, className, autoPlay = false, loop = false, cont
             showBadge ? "scale-100 opacity-100" : "scale-90 opacity-0"
           }`}
         >
-          {isMuted ? (
+          {!soundEnabled ? (
             <svg
               viewBox="0 0 24 24"
               className="h-5 w-5"
@@ -179,10 +181,137 @@ function InteractiveVideo({ src, className, autoPlay = false, loop = false, cont
   );
 }
 
+function WorkCarousel({ videos, soundEnabled, onSoundChange }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragStartX = useRef(0);
+  const dragCurrentX = useRef(0);
+  const viewportRef = useRef(null);
+
+  const clampIndex = (index) => Math.max(0, Math.min(videos.length - 1, index));
+
+  const finishDrag = () => {
+    if (!isDragging) return;
+    const viewportWidth = viewportRef.current?.offsetWidth || 1;
+    const moved = dragCurrentX.current - dragStartX.current;
+    const threshold = Math.max(56, viewportWidth * 0.14);
+
+    if (Math.abs(moved) > threshold) {
+      setActiveIndex((prev) => clampIndex(prev + (moved < 0 ? 1 : -1)));
+    }
+
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+
+  const handlePointerDown = (event) => {
+    dragStartX.current = event.clientX;
+    dragCurrentX.current = event.clientX;
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (event) => {
+    if (!isDragging) return;
+    dragCurrentX.current = event.clientX;
+    setDragOffset(dragCurrentX.current - dragStartX.current);
+  };
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const slideVideos = Array.from(viewport.querySelectorAll("video"));
+    slideVideos.forEach((video, index) => {
+      const isCurrent = index === activeIndex;
+      if (!isCurrent) {
+        video.muted = true;
+        video.pause();
+        return;
+      }
+
+      video.muted = !soundEnabled;
+      if (video.paused) {
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(() => {});
+        }
+      }
+    });
+  }, [activeIndex, soundEnabled]);
+
+  return (
+    <div className="grid w-full gap-3">
+      <div
+        ref={viewportRef}
+        className="overflow-hidden rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] shadow-[0_20px_50px_rgba(35,20,6,0.12)] touch-pan-y"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onPointerLeave={finishDrag}
+      >
+        <div
+          className="flex"
+          style={{
+            transform: `translate3d(calc(${-activeIndex * 100}% + ${dragOffset}px), 0, 0)`,
+            transition: isDragging ? "none" : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
+          {videos.map((video, index) => (
+            <article key={video.file} className="w-full shrink-0 p-2.5">
+              <InteractiveVideo
+                src={mediaUrl(video.file)}
+                className="aspect-[9/16] w-full rounded-[14px] bg-[#d5c0ab] object-cover"
+                autoPlay
+                loop
+                ariaLabel={`Showreel video ${video.number}`}
+                soundEnabled={soundEnabled}
+                onSoundChange={onSoundChange}
+                isActive={activeIndex === index}
+              />
+              <div className="mt-3 flex min-h-0 flex-col items-start gap-1.5 text-[0.9rem] min-[960px]:min-h-[3.2rem] min-[960px]:flex-row min-[960px]:items-start min-[960px]:justify-between min-[960px]:gap-3">
+                <strong>{video.number}</strong>
+                <span className="flex-1 text-[#5e584f]">{video.label}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 pb-1">
+        {videos.map((video, index) => (
+          <button
+            key={`dot-${video.file}`}
+            type="button"
+            aria-label={`Открыть видео ${video.number}`}
+            aria-current={activeIndex === index ? "true" : undefined}
+            className={`h-2.5 rounded-full transition-all duration-300 ${
+              activeIndex === index ? "w-8 bg-[#111111]" : "w-2.5 bg-[#111111]/30 hover:bg-[#111111]/55"
+            }`}
+            onClick={() => setActiveIndex(index)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [heroSoundEnabled, setHeroSoundEnabled] = useState(false);
+  const [workSoundEnabled, setWorkSoundEnabled] = useState(false);
+  const [isWideWorkLayout, setIsWideWorkLayout] = useState(false);
+  const [workCarouselSounds, setWorkCarouselSounds] = useState([false, false, false]);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const workColumns = useMemo(
+    () =>
+      [0, 1, 2].map((shift) =>
+        videos.map((_, index) => videos[(index + shift) % videos.length]),
+      ),
+    [],
+  );
 
   useEffect(() => {
     document.title = "nataliastoianova - reelsmaker & editor";
@@ -235,6 +364,25 @@ export default function App() {
       document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [isMenuOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const handleChange = (event) => setIsWideWorkLayout(event.matches);
+    setIsWideWorkLayout(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    setWorkSoundEnabled(false);
+    setWorkCarouselSounds([false, false, false]);
+  }, [isWideWorkLayout]);
 
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -362,12 +510,20 @@ export default function App() {
 
           <div className="reveal-base mx-auto grid w-full min-w-0 max-w-none gap-3.5 min-[960px]:w-[min(100%,32rem)]" data-reveal aria-label="Превью работ">
             <article className="overflow-hidden rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] shadow-[0_20px_50px_rgba(35,20,6,0.12)]">
-              <InteractiveVideo src={mediaUrl("1.MOV")} className="aspect-[3/4] w-full object-cover" autoPlay loop ariaLabel="Hero preview video" />
+              <InteractiveVideo
+                src={mediaUrl("1.MOV")}
+                className="aspect-[3/4] w-full object-cover"
+                autoPlay
+                loop
+                ariaLabel="Hero preview video"
+                soundEnabled={heroSoundEnabled}
+                onSoundChange={setHeroSoundEnabled}
+              />
             </article>
           </div>
         </section>
 
-        <section className="mb-[22px] overflow-hidden border-y border-[rgba(17,17,17,0.12)] py-2.5 min-[960px]:mb-7 min-[960px]:py-3.5">
+        <section className="mb-[22px] mt-4 overflow-hidden border-y border-[rgba(17,17,17,0.12)] py-2.5 min-[960px]:mb-7 min-[960px]:py-3.5">
           <div className="ticker-marquee flex w-max gap-5 text-[0.78rem] uppercase tracking-[0.18em] text-[#5e584f]">
             {[...tickerItems, ...tickerItems].map((item, index) => (
               <span key={`${item}-${index}`} aria-hidden={index >= tickerItems.length}>
@@ -376,10 +532,10 @@ export default function App() {
             ))}
           </div>
         </section>
-
+<hr />
         <section className="reveal-base pt-7 min-[1040px]:pt-15" data-reveal>
           <div className="mb-[18px] grid gap-2.5 min-[960px]:mb-[22px]">
-            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">кто я</p>
+            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">обо мне</p>
             <h2 className="m-0 max-w-full font-[Georgia,'Times_New_Roman',serif] text-[clamp(1.9rem,11vw,3rem)] leading-[0.96] text-balance min-[960px]:max-w-[11ch] min-[960px]:text-[clamp(2rem,8vw,4.6rem)]">
               Снимаю быстро. Монтирую точно. Делаю ролики, которые цепляют с первых секунд.
             </h2>
@@ -389,35 +545,44 @@ export default function App() {
               Мой фокус - короткий формат, в котором важна не просто красивая картинка, а ритм, чувство кадра
               и монтаж, который удерживает внимание.
             </p>
-            <p className="m-0">
-              Работаю mobile-first: сайт, контент и подача одинаково хорошо ощущаются в руке на смартфоне и
-              на большом экране.
-            </p>
+        
           </div>
         </section>
 
         <section className="pt-7 min-[1040px]:pt-15" id="work">
           <div className="reveal-base mb-[18px] grid gap-2.5 min-[960px]:mb-[22px]" data-reveal>
-            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">showreel</p>
+            <hr />
+            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">мои работы</p>
             <h2 className="m-0 max-w-full font-[Georgia,'Times_New_Roman',serif] text-[clamp(1.9rem,11vw,3rem)] leading-[0.96] text-balance min-[960px]:max-w-[11ch] min-[960px]:text-[clamp(2rem,8vw,4.6rem)]">
-              Живая сетка из реальных видео
+              Карусель моих работ
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2 min-[640px]:gap-3.5 min-[960px]:grid-cols-3 min-[1040px]:grid-cols-4">
-            {videos.map((video, index) => (
-              <article
-                key={video.file}
-                data-reveal
-                className={`reveal-base flex h-full flex-col rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] p-2.5 shadow-[0_20px_50px_rgba(35,20,6,0.12)] ${index === 0 ? "min-[1040px]:translate-y-6" : ""} ${index === 2 ? "min-[1040px]:-translate-y-2.5" : ""}`}
-              >
-                <InteractiveVideo src={mediaUrl(video.file)} className="aspect-[9/16] w-full rounded-[14px] bg-[#d5c0ab] object-cover" autoPlay loop ariaLabel={`Showreel video ${video.number}`} />
-                <div className="mt-3 flex min-h-0 flex-col items-start gap-1.5 text-[0.86rem] min-[960px]:min-h-[3.2rem] min-[960px]:flex-row min-[960px]:items-start min-[960px]:justify-between min-[960px]:gap-3 min-[960px]:text-[0.9rem]">
-                  <strong>{video.number}</strong>
-                  <span className="flex-1 text-[#5e584f]">{video.label}</span>
-                </div>
-              </article>
-            ))}
+          <div className="reveal-base" data-reveal>
+            {!isWideWorkLayout ? (
+              <div className="mx-auto w-full max-w-[420px]">
+                <WorkCarousel
+                  videos={videos}
+                  soundEnabled={workSoundEnabled}
+                  onSoundChange={setWorkSoundEnabled}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 min-[1040px]:gap-4">
+                {workColumns.map((columnVideos, columnIndex) => (
+                  <WorkCarousel
+                    key={`work-column-${columnIndex}`}
+                    videos={columnVideos}
+                    soundEnabled={workCarouselSounds[columnIndex]}
+                    onSoundChange={(enabled) =>
+                      setWorkCarouselSounds((prev) =>
+                        prev.map((_, index) => (enabled ? index === columnIndex : false)),
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
