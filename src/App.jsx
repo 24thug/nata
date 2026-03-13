@@ -22,15 +22,27 @@ const tickerItems = [
 const services = [
   {
     title: "Reels Production",
-    text: "Идея, съемка, монтаж, титры, ритм и готовый вертикальный ролик под публикацию.",
+    price: "от 5 000 ₽",
+    badge: "Вертикальные видео",
+    text: "Идея, съемка, монтаж: готовый вертикальный ролик под публикацию.",
+  detailsText: "Создаем Reels под ключ: от идеи и сценария до съёмки и финального монтажа. Подбираем кадры, добавляем графику и динамику, чтобы ролик выглядел профессионально и привлекал внимание в ленте.",
+features: ["сценарий + съемка", "монтаж", "готово к публикации"],
   },
   {
     title: "Editing Only",
-    text: "Соберу из вашего материала сильный reel с правильной динамикой и акцентами.",
+    price: "от 3 000 ₽",
+    badge: "Монтаж",
+    text: "Соберу из вашего материала сильный рилс с правильной динамикой и акцентами.",
+     detailsText: "Работаю с вашим исходным материалом: отбираю лучшие моменты, выстраиваю динамику, добавляю акценты, музыку и монтажные переходы. В итоге вы получаете готовый Reels, который удерживает внимание и выглядит профессионально.",
+features: ["работа с вашим исходником", "ритм и удержание", "3 круга правок"],
   },
   {
     title: "Content Day",
+    price: "от 35 000 ₽",
+    badge: "Месяц контента",
     text: "Пакетная съемка серии роликов за один съемочный день с продуманной структурой.",
+      detailsText: "Полноценный съёмочный день, в рамках которого создаём серию Reels по заранее продуманному контент-плану. Вы получаете пакет роликов в едином стиле, готовых для публикации на несколько недель вперёд.",
+features: ["серия роликов за день", "контент на месяц", "единый визуальный стиль"],
   },
 ];
 
@@ -94,6 +106,23 @@ function InteractiveVideo({
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [autoPlay, isActive, soundEnabled, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting && isActive && soundEnabled) {
+          onSoundChange?.(false);
+        }
+      },
+      { threshold: 0.2 },
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [isActive, soundEnabled, onSoundChange]);
 
   useEffect(() => {
     if (!showBadge) return undefined;
@@ -303,6 +332,7 @@ export default function App() {
   const [workSoundEnabled, setWorkSoundEnabled] = useState(false);
   const [isWideWorkLayout, setIsWideWorkLayout] = useState(false);
   const [workCarouselSounds, setWorkCarouselSounds] = useState([false, false, false]);
+  const [activeService, setActiveService] = useState(null);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
   const workColumns = useMemo(
@@ -342,11 +372,11 @@ export default function App() {
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    document.body.style.overflow = isMenuOpen || Boolean(activeService) ? "hidden" : "";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, activeService]);
 
   useEffect(() => {
     if (!isMenuOpen) return undefined;
@@ -383,6 +413,19 @@ export default function App() {
     setWorkSoundEnabled(false);
     setWorkCarouselSounds([false, false, false]);
   }, [isWideWorkLayout]);
+
+  useEffect(() => {
+    if (!activeService) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setActiveService(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [activeService]);
 
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -434,7 +477,7 @@ export default function App() {
         <nav className="hidden items-center gap-[18px] text-[0.82rem] uppercase tracking-[0.12em] min-[960px]:inline-flex">
           <a href="#work">Работы</a>
           <a href="#services">Услуги</a>
-          <a href="#contact">Контакт</a>
+          <a href="#contact">Контакты</a>
         </nav>
 
         <nav
@@ -552,7 +595,7 @@ export default function App() {
         <section className="pt-7 min-[1040px]:pt-15" id="work">
           <div className="reveal-base mb-[18px] grid gap-2.5 min-[960px]:mb-[22px]" data-reveal>
             <hr />
-            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">мои работы</p>
+            <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b] pt-10">мои работы</p>
             <h2 className="m-0 max-w-full font-[Georgia,'Times_New_Roman',serif] text-[clamp(1.9rem,11vw,3rem)] leading-[0.96] text-balance min-[960px]:max-w-[11ch] min-[960px]:text-[clamp(2rem,8vw,4.6rem)]">
               Карусель моих работ
             </h2>
@@ -587,21 +630,62 @@ export default function App() {
         </section>
 
         <section className="pt-7 min-[1040px]:pt-15" id="services">
-          <div className="reveal-base mb-[18px] grid gap-2.5 min-[960px]:mb-[22px]" data-reveal>
+          <div className="mb-[18px] grid gap-2.5 min-[960px]:mb-[22px]">
             <p className="m-0 text-[0.78rem] uppercase tracking-[0.22em] text-[#cf452b]">услуги</p>
             <h2 className="m-0 max-w-full font-[Georgia,'Times_New_Roman',serif] text-[clamp(1.9rem,11vw,3rem)] leading-[0.96] text-balance min-[960px]:max-w-[11ch] min-[960px]:text-[clamp(2rem,8vw,4.6rem)]">
               Форматы, с которыми я работаю
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2 min-[640px]:gap-3.5 min-[960px]:grid-cols-3">
-            {services.map((service) => (
+            {services.map((service, index) => (
               <article
                 key={service.title}
-                data-reveal
-                className="reveal-base rounded-[24px] border border-[rgba(17,17,17,0.12)] bg-[rgba(255,250,243,0.88)] p-3.5 shadow-[0_20px_50px_rgba(35,20,6,0.12)]"
+                className={`relative overflow-hidden rounded-[24px] border p-3.5 shadow-[0_14px_34px_rgba(35,20,6,0.1)] ${
+                  index === 1
+                    ? "border-[#cf452b]/35 bg-[linear-gradient(165deg,rgba(207,69,43,0.13),rgba(255,250,243,0.96)_45%,rgba(255,250,243,0.92))]"
+                    : "border-[rgba(17,17,17,0.12)] bg-[linear-gradient(165deg,rgba(100,149,237,0.1),rgba(255,250,243,0.94)_45%,rgba(255,250,243,0.9))]"
+                }`}
               >
-                <h3 className="mb-2.5 mt-0 text-[1.2rem]">{service.title}</h3>
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] ${
+                      index === 1
+                        ? "border-[#cf452b]/45 bg-[#cf452b]/12 text-[#a53a26]"
+                        : "border-[#6495ED]/40 bg-[#6495ED]/12 text-[#3e6fc6]"
+                    }`}
+                  >
+                    {service.badge}
+                  </span>
+                  <span className="text-right text-[1.02rem] font-bold tracking-[0.02em] text-[#111111]">
+                    {service.price}
+                  </span>
+                </div>
+
+                <h3 className="mb-2 mt-0 text-[1.24rem] leading-tight">{service.title}</h3>
                 <p className="m-0 text-base leading-[1.6] text-[#5e584f]">{service.text}</p>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {service.features.map((feature) => (
+                    <span
+                      key={`${service.title}-${feature}`}
+                      className="rounded-full border border-[rgba(17,17,17,0.12)] bg-white/65 px-2.5 py-1 text-[0.7rem] uppercase tracking-[0.08em] text-[#4b453d]"
+                    >
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className={`mt-4 inline-flex min-h-10 items-center justify-center rounded-full border px-4 text-[0.72rem] font-bold uppercase tracking-[0.12em] ${
+                    index === 1
+                      ? "border-[#cf452b]/45 bg-[#cf452b]/10 text-[#a53a26]"
+                      : "border-[#111111]/20 bg-white/70 text-[#111111]"
+                  }`}
+                  onClick={() => setActiveService(service)}
+                >
+                  Узнать детали
+                </button>
               </article>
             ))}
           </div>
@@ -638,11 +722,70 @@ export default function App() {
         </section>
       </main>
 
+      {activeService ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 min-[640px]:p-5"
+          onClick={() => setActiveService(null)}
+        >
+          <div className="absolute inset-0 bg-[rgba(17,17,17,0.34)] backdrop-blur-sm animate-[modalFade_200ms_ease-out]" />
+          <article
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Детали услуги ${activeService.title}`}
+            className="relative z-10 w-full max-w-[560px] rounded-[24px] border border-[rgba(17,17,17,0.14)] bg-[rgba(255,250,243,0.97)] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.28)] animate-[modalPop_220ms_cubic-bezier(0.22,1,0.36,1)] min-[640px]:p-5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Закрыть"
+              className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(17,17,17,0.16)] bg-white/80 text-[#111111] transition hover:bg-[#111111] hover:text-[#fffaf3]"
+              onClick={() => setActiveService(null)}
+            >
+              ×
+            </button>
+
+            <p className="m-0 text-[0.72rem] uppercase tracking-[0.2em] text-[#cf452b]">пакет</p>
+            <h3 className="mb-2 mt-2 text-[1.55rem] leading-tight">{activeService.title}</h3>
+            <p className="m-0 text-[1.02rem] font-bold text-[#111111]">{activeService.price}</p>
+            <p className="m-0 mt-3 text-base leading-[1.6] text-[#5e584f]">{activeService.detailsText || activeService.text}</p>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {activeService.features.map((feature) => (
+                <span
+                  key={`modal-${activeService.title}-${feature}`}
+                  className="rounded-full border border-[rgba(17,17,17,0.12)] bg-white/75 px-2.5 py-1 text-[0.7rem] uppercase tracking-[0.08em] text-[#4b453d]"
+                >
+                  {feature}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-2.5 min-[640px]:grid-cols-2">
+              <a
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#111111] px-4 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[#fffaf3] transition hover:-translate-y-0.5"
+                href="https://instagram.com/nataliastoianova"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Написать в Instagram
+              </a>
+              <a
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-[rgba(17,17,17,0.14)] px-4 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-[#111111] transition hover:-translate-y-0.5 hover:bg-[#111111] hover:text-[#fffaf3]"
+                href="https://t.me/nataliastoianova"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Написать в Telegram
+              </a>
+            </div>
+          </article>
+        </div>
+      ) : null}
+
       <footer
         className={`flex flex-col gap-1.5 py-5 text-[0.76rem] text-[#5e584f] transition duration-200 min-[960px]:pt-7 min-[960px]:text-[0.82rem] ${isMenuOpen ? "max-[959px]:pointer-events-none max-[959px]:select-none max-[959px]:opacity-45 max-[959px]:blur-sm" : ""}`}
       >
-        <p className="m-0">&copy; {new Date().getFullYear()} nataliastoianova</p>
-        <p className="m-0">mobile-first portfolio / shot & edited for attention</p>
+        <p className="m-0">&copy; {new Date().getFullYear()} nataliastoianova | мобильный видеограф и монтажер</p>
       </footer>
     </div>
   );
