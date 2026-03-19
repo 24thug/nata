@@ -16,6 +16,15 @@
     color: #111111;
     font-family: "Trebuchet MS", "Arial Narrow", Arial, sans-serif;
   }
+
+  :where(a, button, video[role="button"]) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :where(a, button, video[role="button"]):focus-visible {
+    outline: 2px solid #6495ed;
+    outline-offset: 3px;
+  }
 }
 
 @layer utilities {
@@ -48,6 +57,12 @@
   .ticker-marquee {
     animation: ticker 22s linear infinite;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-marquee {
+      animation: none;
+    }
+  }
 }
 
 @keyframes ticker {
@@ -79,5 +94,27 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalFadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalPopOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
   }
 }

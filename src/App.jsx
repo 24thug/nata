@@ -151,6 +151,13 @@ function InteractiveVideo({
     setIsBlurred(true);
   };
 
+  const handleVideoKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleSound();
+    }
+  };
+
   return (
     <div className="relative">
       <video
@@ -163,6 +170,10 @@ function InteractiveVideo({
         playsInline
         preload="metadata"
         onClick={toggleSound}
+        onKeyDown={handleVideoKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-pressed={soundEnabled && isActive}
         aria-label={ariaLabel}
       >
         <source src={src} />
@@ -333,8 +344,13 @@ export default function App() {
   const [isWideWorkLayout, setIsWideWorkLayout] = useState(false);
   const [workCarouselSounds, setWorkCarouselSounds] = useState([false, false, false]);
   const [activeService, setActiveService] = useState(null);
+  const [isServiceClosing, setIsServiceClosing] = useState(false);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const serviceDialogRef = useRef(null);
+  const closeDialogButtonRef = useRef(null);
+  const lastFocusedElementRef = useRef(null);
+  const closeServiceTimerRef = useRef(null);
   const workColumns = useMemo(
     () =>
       [0, 1, 2].map((shift) =>
@@ -415,26 +431,93 @@ export default function App() {
   }, [isWideWorkLayout]);
 
   useEffect(() => {
+    return () => {
+      if (closeServiceTimerRef.current) {
+        clearTimeout(closeServiceTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!activeService) return undefined;
 
-    const handleEscape = (event) => {
+    const previousFocus = document.activeElement;
+    lastFocusedElementRef.current = previousFocus instanceof HTMLElement ? previousFocus : null;
+    closeDialogButtonRef.current?.focus();
+
+    const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        setActiveService(null);
+        if (isServiceClosing) return;
+        setIsServiceClosing(true);
+        closeServiceTimerRef.current = setTimeout(() => {
+          setActiveService(null);
+          setIsServiceClosing(false);
+          closeServiceTimerRef.current = null;
+        }, 220);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const dialog = serviceDialogRef.current;
+      if (!dialog) return;
+
+      const focusableElements = dialog.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      const focusable = Array.from(focusableElements).filter(
+        (element) =>
+          !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [activeService]);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      lastFocusedElementRef.current?.focus?.();
+    };
+  }, [activeService, isServiceClosing]);
 
   const closeMenu = () => setIsMenuOpen(false);
+
+  const openService = (service) => {
+    if (closeServiceTimerRef.current) {
+      clearTimeout(closeServiceTimerRef.current);
+      closeServiceTimerRef.current = null;
+    }
+    setIsServiceClosing(false);
+    setActiveService(service);
+  };
+
+  const closeService = () => {
+    if (!activeService || isServiceClosing) return;
+    setIsServiceClosing(true);
+    closeServiceTimerRef.current = setTimeout(() => {
+      setActiveService(null);
+      setIsServiceClosing(false);
+      closeServiceTimerRef.current = null;
+    }, 220);
+  };
 
   return (
     <div
       id="top"
       className="mx-auto w-[min(calc(100%-24px),1180px)] min-[640px]:w-[min(calc(100%-40px),1180px)] min-[960px]:w-[min(calc(100%-52px),1180px)]"
     >
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 py-2.5 backdrop-blur-[14px] min-[960px]:gap-4 min-[960px]:py-3.5">
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-2 py-2.5 min-[960px]:gap-4 min-[960px]:py-3.5 relative isolate before:content-[''] before:absolute before:inset-y-0 before:left-1/2 before:w-screen before:-translate-x-1/2 before:bg-[rgba(255,250,243,0.45)] before:backdrop-blur-[14px] before:-z-10">
         <a
           className="inline-flex min-w-0 max-w-[calc(100%-58px)] items-center gap-2.5 min-[960px]:max-w-none min-[960px]:gap-3"
           href="#top"
@@ -474,10 +557,10 @@ export default function App() {
           />
         </button>
 
-        <nav className="hidden items-center gap-[18px] text-[0.82rem] uppercase tracking-[0.12em] min-[960px]:inline-flex">
-          <a href="#work">Работы</a>
-          <a href="#services">Услуги</a>
-          <a href="#contact">Контакты</a>
+        <nav className="hidden items-center gap-4 rounded-full border border-[rgba(17,17,17,0.2)] bg-[rgba(255,250,243,0.9)] px-4 py-2 text-[0.82rem] uppercase tracking-[0.12em] text-[#111111] shadow-[0_10px_26px_rgba(0,0,0,0.16)] backdrop-blur-md min-[960px]:inline-flex">
+          <a className="transition hover:text-black/65" href="#work">Работы</a>
+          <a className="transition hover:text-black/65" href="#services">Услуги</a>
+          <a className="transition hover:text-black/65" href="#contact">Контакты</a>
         </nav>
 
         <nav
@@ -521,11 +604,9 @@ export default function App() {
               <span className="absolute left-5 top-[55%] rotate-[-13deg] font-['Lavishly_Yours'] text-[50px] leading-none text-[#6495ED] min-[960px]:text-[50px]">
                 by
               </span>
-              <h1 className="m-0 max-w-full [overflow-wrap:anywhere] pl-10 rotate-[-13deg] font-['Caveat'] text-[74px] leading-[0.92] min-[960px]:text-[clamp(2.8rem,10vw,6.2rem)] min-[960px]:leading-[1.02]">
-                Natalia
-              </h1>
-              <h1 className="-mt-2 m-0 max-w-full [overflow-wrap:anywhere] pl-[6.25rem] rotate-[-13deg] font-['Caveat'] text-[74px] leading-[0.92] min-[960px]:mt-0 min-[960px]:text-[clamp(2.8rem,10vw,6.2rem)] min-[960px]:leading-[1.02]">
-                Stoianova
+              <h1 className="m-0 max-w-full [overflow-wrap:anywhere] rotate-[-13deg] font-['Caveat'] text-[74px] leading-[0.92] min-[960px]:text-[clamp(2.8rem,10vw,6.2rem)] min-[960px]:leading-[1.02]">
+                <span className="block pl-10">Natalia</span>
+                <span className="-mt-2 block pl-[6.25rem] min-[960px]:mt-0">Stoianova</span>
               </h1>
             </div>
             <p className="m-0 pt-5 text-[0.95rem] leading-[1.55] text-[#5e584f] min-[960px]:text-base min-[960px]:leading-[1.6]">
@@ -637,57 +718,99 @@ export default function App() {
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-3 min-[640px]:grid-cols-2 min-[640px]:gap-3.5 min-[960px]:grid-cols-3">
-            {services.map((service, index) => (
-              <article
-                key={service.title}
-                className={`relative overflow-hidden rounded-[24px] border p-3.5 shadow-[0_14px_34px_rgba(35,20,6,0.1)] ${
-                  index === 1
-                    ? "border-[#cf452b]/35 bg-[linear-gradient(165deg,rgba(207,69,43,0.13),rgba(255,250,243,0.96)_45%,rgba(255,250,243,0.92))]"
-                    : "border-[rgba(17,17,17,0.12)] bg-[linear-gradient(165deg,rgba(100,149,237,0.1),rgba(255,250,243,0.94)_45%,rgba(255,250,243,0.9))]"
-                }`}
-              >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] ${
-                      index === 1
-                        ? "border-[#cf452b]/45 bg-[#cf452b]/12 text-[#a53a26]"
-                        : "border-[#6495ED]/40 bg-[#6495ED]/12 text-[#3e6fc6]"
-                    }`}
-                  >
-                    {service.badge}
-                  </span>
-                  <span className="text-right text-[1.02rem] font-bold tracking-[0.02em] text-[#111111]">
-                    {service.price}
-                  </span>
-                </div>
+            {services.map((service, index) => {
+              const isAccent = index === 1;
 
-                <h3 className="mb-2 mt-0 text-[1.24rem] leading-tight">{service.title}</h3>
-                <p className="m-0 text-base leading-[1.6] text-[#5e584f]">{service.text}</p>
-
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {service.features.map((feature) => (
-                    <span
-                      key={`${service.title}-${feature}`}
-                      className="rounded-full border border-[rgba(17,17,17,0.12)] bg-white/65 px-2.5 py-1 text-[0.7rem] uppercase tracking-[0.08em] text-[#4b453d]"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  className={`mt-4 inline-flex min-h-10 items-center justify-center rounded-full border px-4 text-[0.72rem] font-bold uppercase tracking-[0.12em] ${
-                    index === 1
-                      ? "border-[#cf452b]/45 bg-[#cf452b]/10 text-[#a53a26]"
-                      : "border-[#111111]/20 bg-white/70 text-[#111111]"
+              return (
+                <article
+                  key={service.title}
+                  className={`group relative grid min-h-[100%] overflow-hidden rounded-[26px] border p-4 shadow-[0_18px_42px_rgba(22,18,12,0.12)] transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_24px_58px_rgba(22,18,12,0.18)] active:-translate-y-0.5 active:shadow-[0_22px_52px_rgba(22,18,12,0.18)] focus-within:-translate-y-1 focus-within:shadow-[0_24px_58px_rgba(22,18,12,0.18)] min-[960px]:p-[18px] ${
+                    isAccent
+                      ? "border-[#cf452b]/35 bg-[linear-gradient(170deg,rgba(207,69,43,0.13),rgba(255,250,243,0.98)_48%,rgba(255,250,243,0.94))]"
+                      : "border-[rgba(17,17,17,0.12)] bg-[linear-gradient(170deg,rgba(100,149,237,0.09),rgba(255,250,243,0.98)_48%,rgba(255,250,243,0.94))]"
                   }`}
-                  onClick={() => setActiveService(service)}
                 >
-                  Узнать детали
-                </button>
-              </article>
-            ))}
+                  <span
+                    className={`pointer-events-none absolute inset-0 rounded-[26px] border-2 opacity-0 transition-all duration-500 ease-out group-hover:opacity-100 group-active:opacity-100 group-focus-within:opacity-100 ${
+                      isAccent
+                        ? "border-[#cf452b]/55 shadow-[inset_0_0_0_1px_rgba(207,69,43,0.18)]"
+                        : "border-[#6495ED]/50 shadow-[inset_0_0_0_1px_rgba(100,149,237,0.18)]"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={`pointer-events-none absolute inset-0 rounded-[26px] opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-active:opacity-100 group-focus-within:opacity-100 ${
+                      isAccent
+                        ? "bg-[linear-gradient(125deg,rgba(207,69,43,0.0)_20%,rgba(207,69,43,0.14)_50%,rgba(207,69,43,0.0)_78%)]"
+                        : "bg-[linear-gradient(125deg,rgba(100,149,237,0.0)_20%,rgba(100,149,237,0.14)_50%,rgba(100,149,237,0.0)_78%)]"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={`pointer-events-none absolute left-0 right-0 top-0 h-[3px] ${
+                      isAccent
+                        ? "bg-[linear-gradient(90deg,rgba(207,69,43,0.95),rgba(244,148,131,0.72))]"
+                        : "bg-[linear-gradient(90deg,rgba(100,149,237,0.95),rgba(154,184,240,0.72))]"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={`pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-90 ${
+                      isAccent ? "bg-[#f39a87]/35" : "bg-[#8eafe8]/30"
+                    }`}
+                    aria-hidden="true"
+                  />
+
+                  <div className="relative z-10 mb-3 flex items-start justify-between gap-2.5">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-[0.64rem] font-bold uppercase tracking-[0.16em] ${
+                        isAccent
+                          ? "border-[#cf452b]/45 bg-[#cf452b]/12 text-[#a53a26]"
+                          : "border-[#6495ED]/40 bg-[#6495ED]/12 text-[#3e6fc6]"
+                      }`}
+                    >
+                      {service.badge}
+                    </span>
+                    <div className="text-right">
+                      <p className="m-0 text-[1.14rem] font-bold tracking-[0.01em] text-[#111111]">
+                        {service.price}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10">
+                    <h3 className="mb-2 mt-0 text-[1.36rem] leading-[1.05]">{service.title}</h3>
+                    <p className="m-0 text-[1.02rem] leading-[1.55] text-[#5e584f]">{service.text}</p>
+                  </div>
+
+                  <div className="relative z-10 mt-3.5 flex flex-wrap gap-1.5">
+                    {service.features.map((feature) => (
+                      <span
+                        key={`${service.title}-${feature}`}
+                        className="rounded-full border border-[rgba(17,17,17,0.12)] bg-white/80 px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.1em] text-[#4b453d]"
+                      >
+                        {feature}
+                      </span>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`relative z-10 mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border px-4 text-[0.74rem] font-bold uppercase tracking-[0.14em] transition-all duration-300 ease-out will-change-transform hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.14)] active:-translate-y-0.5 active:shadow-[0_10px_22px_rgba(0,0,0,0.14)] focus-visible:-translate-y-0.5 focus-visible:shadow-[0_10px_22px_rgba(0,0,0,0.14)] ${
+                      isAccent
+                        ? "border-[#cf452b]/45 bg-[#cf452b]/10 text-[#a53a26] hover:bg-[#cf452b] hover:text-[#fff7ee]"
+                        : "border-[#111111]/20 bg-white/75 text-[#111111] hover:bg-[#111111] hover:text-[#fff7ee]"
+                    }`}
+                    onClick={() => openService(service)}
+                  >
+                    Узнать детали
+                    <span className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">
+                      →
+                    </span>
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -725,21 +848,33 @@ export default function App() {
       {activeService ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 min-[640px]:p-5"
-          onClick={() => setActiveService(null)}
+          onClick={closeService}
         >
-          <div className="absolute inset-0 bg-[rgba(17,17,17,0.34)] backdrop-blur-sm animate-[modalFade_200ms_ease-out]" />
+          <div
+            className={`absolute inset-0 bg-[rgba(17,17,17,0.34)] backdrop-blur-sm ${
+              isServiceClosing
+                ? "animate-[modalFadeOut_200ms_ease-in_forwards]"
+                : "animate-[modalFade_220ms_ease-out]"
+            }`}
+          />
           <article
+            ref={serviceDialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={`Детали услуги ${activeService.title}`}
-            className="relative z-10 w-full max-w-[560px] rounded-[24px] border border-[rgba(17,17,17,0.14)] bg-[rgba(255,250,243,0.97)] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.28)] animate-[modalPop_220ms_cubic-bezier(0.22,1,0.36,1)] min-[640px]:p-5"
+            className={`relative z-10 w-full max-w-[560px] rounded-[24px] border border-[rgba(17,17,17,0.14)] bg-[rgba(255,250,243,0.97)] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.28)] min-[640px]:p-5 ${
+              isServiceClosing
+                ? "animate-[modalPopOut_200ms_cubic-bezier(0.4,0,1,1)_forwards]"
+                : "animate-[modalPop_220ms_cubic-bezier(0.22,1,0.36,1)]"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
             <button
+              ref={closeDialogButtonRef}
               type="button"
               aria-label="Закрыть"
-              className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(17,17,17,0.16)] bg-white/80 text-[#111111] transition hover:bg-[#111111] hover:text-[#fffaf3]"
-              onClick={() => setActiveService(null)}
+              className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(17,17,17,0.16)] bg-white/80 text-[#111111] shadow-[0_6px_14px_rgba(0,0,0,0.08)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-105 hover:bg-[#111111] hover:text-[#fffaf3] hover:shadow-[0_12px_22px_rgba(0,0,0,0.2)] active:translate-y-0 active:scale-95 active:shadow-[0_4px_10px_rgba(0,0,0,0.14)] focus-visible:-translate-y-0.5 focus-visible:scale-105 focus-visible:bg-[#111111] focus-visible:text-[#fffaf3] focus-visible:shadow-[0_12px_22px_rgba(0,0,0,0.2)]"
+              onClick={closeService}
             >
               ×
             </button>
